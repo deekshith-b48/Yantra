@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clerkId      String   @unique @map("clerk_id")
+  email        String
+  githubToken  String?  @map("github_token")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  repos Repo[]
+  runs  Run[]
+
+  @@map("users")
+}
+
+model Repo {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  fullName        String    @map("full_name")
+  defaultBranch   String    @default("main") @map("default_branch")
+  lastIndexedAt   DateTime? @map("last_indexed_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User  @relation(fields: [userId], references: [id])
+  runs Run[]
+
+  @@map("repos")
+}
+
+model Run {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  repoId     String   @map("repo_id") @db.Uuid
+  spec       String
+  status     String   // queued|indexing|planning|awaiting_approval|implementing|testing|opening_pr|done|failed
+  plan       Json?
+  prUrl      String?  @map("pr_url")
+  prNumber   Int?     @map("pr_number")
+  branchName String?  @map("branch_name")
+  error      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user  User      @relation(fields: [userId], references: [id])
+  repo  Repo      @relation(fields: [repoId], references: [id])
+  steps RunStep[]
+
+  @@map("runs")
+}
+
+model RunStep {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId      String    @map("run_id") @db.Uuid
+  step       String    // ingest|index|plan|implement|test|pr
+  status     String    // running|done|failed
+  log        String[]
+  startedAt  DateTime? @map("started_at") @db.Timestamptz
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz
+
+  run Run @relation(fields: [runId], references: [id])
+
+  @@map("run_steps")
+}
